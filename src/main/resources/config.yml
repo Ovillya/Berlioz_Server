@@ -1,0 +1,4 @@
+# BerliozServer config
+
+# Seconds to wait after a player loses a DJ broadcast
+ambient-grace-seconds: 3
