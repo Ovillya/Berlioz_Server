@@ -1,0 +1,6 @@
+main: ${MAIN}
+name: ${NAME}
+version: "${VERSION}"
+api-version: ${MINECRAFT_VERSION}
+author: ${AUTHOR}
+description: ${DESCRIPTION}

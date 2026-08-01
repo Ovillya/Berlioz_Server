@@ -3,6 +3,7 @@ import java.text.SimpleDateFormat
 plugins {
     id 'com.gradleup.shadow' version '9.4.1'
     id 'java'
+    id 'io.papermc.paperweight.userdev' version "2.0.0-beta.21"
 }
 
 group = "vai.berlioz"
@@ -44,34 +45,11 @@ tasks.withType(JavaCompile).configureEach {
 }
 
 repositories {
-    maven {
-        name = 'papermc'
-        url = 'https://repo.papermc.io/repository/maven-public/'
-        content {
-            includeModule("io.papermc.paper", "paper-api")
-            includeModule("io.papermc", "paperlib")
-            includeModule("net.md-5", "bungeecord-chat")
-            includeGroup("io.papermc.adventure")
-        }
-    }
-
-    maven {
-        name = 'minecraft'
-        url = 'https://libraries.minecraft.net'
-        content {
-            includeModule("com.mojang", "brigadier")
-        }
-    }
-
     mavenCentral()
 }
 
 dependencies {
-    compileOnly 'io.papermc.paper:paper-api:26.1.2.build.+'
-    compileOnly 'com.github.spotbugs:spotbugs-annotations:4.9.8'
-    implementation 'io.papermc:paperlib:1.0.8'
-    testCompileOnly 'com.github.spotbugs:spotbugs-annotations:4.9.8'
-    testImplementation 'io.papermc.paper:paper-api:26.1.2.build.+'
+    paperweight.paperDevBundle("${minecraft_version}.build.+")
     testImplementation 'org.junit.jupiter:junit-jupiter:6.1.0'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher:6.1.0'
 }
@@ -81,22 +59,17 @@ test {
 }
 
 processResources {
-    filesMatching("**/plugin.yml") {
+    filesMatching("**/paper-plugin.yml") {
         expand(
             NAME: rootProject.name,
             VERSION: version,
+            MINECRAFT_VERSION: minecraft_version,
             PACKAGE: rootProject.group.toString(),
             MAIN: "${rootProject.group}.${rootProject.name.replace("_", "")}",
             AUTHOR: hasProperty('pluginAuthor') ? property('pluginAuthor') : 'vainerii',
             DESCRIPTION: hasProperty('pluginDesc') ? property('pluginDesc') : "${rootProject.name} plugin"
         )
     }
-}
-
-shadowJar {
-    archiveClassifier.set('')
-    relocate 'io.papermc.lib', 'shadow.io.papermc.paperlib'
-    minimize()
 }
 
 // Disable jar and replace with shadowJar
