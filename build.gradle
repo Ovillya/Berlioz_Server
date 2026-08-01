@@ -1,9 +1,9 @@
 import java.text.SimpleDateFormat
 
 plugins {
-    id 'com.gradleup.shadow' version '9.4.1'
     id 'java'
     id 'io.papermc.paperweight.userdev' version "2.0.0-beta.21"
+    id 'xyz.jpenilla.run-paper' version "3.0.2"
 }
 
 group = "vai.berlioz"
@@ -72,9 +72,15 @@ processResources {
     }
 }
 
-// Disable jar and replace with shadowJar
-jar.enabled = false
-assemble.dependsOn(shadowJar)
+runServer {
+    minecraftVersion(minecraft_version)
+
+    javaLauncher = javaToolchains.launcherFor {
+        vendor = JvmVendorSpec.JETBRAINS
+        languageVersion = JavaLanguageVersion.of(25)
+    }
+}
+
 
 tasks.register('printProjectName') {
     doLast {
@@ -82,15 +88,8 @@ tasks.register('printProjectName') {
     }
 }
 
-tasks.register('release') {
-    dependsOn build
-
-    doLast {
-        if (!version.endsWith("-SNAPSHOT")) {
-            // Rename final JAR to trim off version information
-            shadowJar.archiveFile.get().getAsFile()
-                    .renameTo(layout.buildDirectory.get().toString() + File.separator + 'libs' + File.separator
-                            + rootProject.name + '.jar')
-        }
+jar {
+    if (!version.endsWith("-SNAPSHOT")) {
+        archiveFileName = "${rootProject.name}.jar"
     }
 }
