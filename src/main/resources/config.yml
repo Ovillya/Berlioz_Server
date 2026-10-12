@@ -2,3 +2,9 @@
 
 # Seconds to wait after a player loses a DJ broadcast
 ambient-grace-seconds: 3
+
+# Remind modless players about the mod, N seconds after they join (unless they handshake first)
+join-reminder:
+  enabled: true
+  delay-seconds: 60
+  modrinth-url: "https://modrinth.com/mod/berlioz"

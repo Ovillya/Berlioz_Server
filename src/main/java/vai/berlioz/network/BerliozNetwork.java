@@ -10,15 +10,26 @@ import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.logging.Level;
+import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.event.ClickEvent;
+import net.kyori.adventure.text.event.HoverEvent;
+import net.kyori.adventure.text.format.NamedTextColor;
+import net.kyori.adventure.text.format.TextDecoration;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.entity.Player;
+import org.bukkit.event.EventHandler;
+import org.bukkit.event.player.PlayerJoinEvent;
+import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.plugin.messaging.PluginMessageListener;
+import vai.berlioz.Messages;
 import vai.berlioz.ambient.AmbientZone;
 import vai.berlioz.ambient.AmbientZoneStore;
 
@@ -39,6 +50,8 @@ public final class BerliozNetwork {
     private static final int MAX_ZONE_URLS = 256;
 
     private static final Map<Byte, Handler> HANDLERS = new HashMap<>();
+
+    private static final Set<UUID> handshaked = new HashSet<>();
 
     private static BroadcastManager broadcasts;
     private static AmbientZoneStore ambientZones;
@@ -62,7 +75,10 @@ public final class BerliozNetwork {
         broadcasts = new BroadcastManager(owner, ambientZones, graceMillis);
         broadcasts.start();
 
+        owner.getServer().getPluginManager().registerEvents(new ConnectionListener(), owner);
+
         registerReceiver(MessageType.HELLO, (player, body) -> {
+            handshaked.add(player.getUniqueId());
             String version = new String(body, StandardCharsets.UTF_8);
             owner.getLogger().info("Berlioz client " + version + " connected for " + player.getName());
             send(player, MessageType.WELCOME,
@@ -111,6 +127,41 @@ public final class BerliozNetwork {
             (byte) (player.hasPermission(PLAYLIST_PERMISSION) ? 1 : 0),
             (byte) (player.hasPermission(AMBIENT_PERMISSION) ? 1 : 0)
         });
+    }
+
+    /** Schedules and show the "install Berlioz" for modless players. */
+    private static final class ConnectionListener implements org.bukkit.event.Listener {
+        @EventHandler
+        public void onJoin(PlayerJoinEvent event) {
+            if (!plugin.getConfig().getBoolean("join-reminder.enabled", true)) return;
+            long delaySeconds = Math.max(1L, plugin.getConfig().getLong("join-reminder.delay-seconds", 60));
+            UUID id = event.getPlayer().getUniqueId();
+            Bukkit.getScheduler().runTaskLater(plugin, () -> sendJoinReminder(id), delaySeconds * 20L);
+        }
+
+        @EventHandler
+        public void onQuit(PlayerQuitEvent event) {
+            handshaked.remove(event.getPlayer().getUniqueId());
+        }
+    }
+
+    private static void sendJoinReminder(UUID id) {
+        Player player = Bukkit.getPlayer(id);
+        if (player == null || handshaked.contains(id)
+                || player.getListeningPluginChannels().contains(BerliozChannel.KEY)) {
+            return;
+        }
+        String url = plugin.getConfig().getString(
+                "join-reminder.modrinth-url", "https://modrinth.com/mod/berlioz");
+        Messages.Lang lang = Messages.langOf(player);
+        Component link = Component.text(Messages.get(lang, "reminder.link"))
+                .color(NamedTextColor.WHITE)
+                .decorate(TextDecoration.UNDERLINED)
+                .clickEvent(ClickEvent.openUrl(url))
+                .hoverEvent(HoverEvent.showText(Component.text(url)));
+        player.sendMessage(Component.text(Messages.get(lang, "reminder.pre"), NamedTextColor.AQUA)
+                .append(link)
+                .append(Component.text(Messages.get(lang, "reminder.post"), NamedTextColor.AQUA)));
     }
 
     private static void relayToNearby(Player sender, byte[] body, byte orderType, String label) {
