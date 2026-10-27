@@ -19,6 +19,7 @@ import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.plugin.java.JavaPlugin;
+import vai.berlioz.Messages;
 import vai.berlioz.ambient.AmbientZone;
 import vai.berlioz.ambient.AmbientZoneStore;
 
@@ -454,14 +455,15 @@ public final class BroadcastManager implements Listener {
         if (url.equals(chatNotified.get(id))) return;
         chatNotified.put(id, url);
         if (!url.startsWith("http")) return; // Trick for mc thing
-        Component link = Component.text("Click here")
+        Messages.Lang lang = Messages.langOf(p);
+        Component link = Component.text(Messages.get(lang, "music.listen"))
                 .color(NamedTextColor.WHITE)
                 .decorate(TextDecoration.UNDERLINED)
                 .clickEvent(ClickEvent.openUrl(url))
                 .hoverEvent(HoverEvent.showText(Component.text(url)));
-        p.sendMessage(Component.text("[♪ Music playing: ", NamedTextColor.AQUA)
+        p.sendMessage(Component.text(Messages.get(lang, "music.prefix"), NamedTextColor.AQUA)
                 .append(link)
-                .append(Component.text(" ♪]", NamedTextColor.AQUA)));
+                .append(Component.text(Messages.get(lang, "music.suffix"), NamedTextColor.AQUA)));
     }
 
     /** Sends the ambient track at index of zone to listener. */
