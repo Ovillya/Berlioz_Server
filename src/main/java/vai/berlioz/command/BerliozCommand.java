@@ -1,114 +1,72 @@
 package vai.berlioz.command;
 
-import java.util.Locale;
+import com.mojang.brigadier.Command;
+import com.mojang.brigadier.builder.LiteralArgumentBuilder;
+import com.mojang.brigadier.context.CommandContext;
+import io.papermc.paper.command.brigadier.CommandSourceStack;
+import io.papermc.paper.command.brigadier.Commands;
+import io.papermc.paper.command.brigadier.argument.ArgumentTypes;
+import io.papermc.paper.command.brigadier.argument.resolvers.selector.PlayerSelectorArgumentResolver;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
-import org.bukkit.Location;
-import org.bukkit.command.BlockCommandSender;
-import org.bukkit.command.Command;
-import org.bukkit.command.CommandExecutor;
-import org.bukkit.command.CommandSender;
-import org.bukkit.entity.Player;
+import org.jspecify.annotations.NonNull;
+import vai.berlioz.BerliozServer;
+import vai.berlioz.command.arguments.UriArgumentType;
 import vai.berlioz.network.BerliozNetwork;
 
+import java.net.URI;
 
-public final class BerliozCommand implements CommandExecutor {
+public class BerliozCommand {
 
-    @Override
-    public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
-        if (!isAllowed(sender)) {
-            reply(sender, "You don't have permission to use /berlioz.", NamedTextColor.RED);
-            return true;
-        }
-        if (args.length == 0) {
-            sendUsage(sender);
-            return true;
-        }
-        switch (args[0].toLowerCase(Locale.ROOT)) {
-            case "play" -> handlePlay(sender, args);
-            case "stop" -> handleStop(sender);
-            case "cache" -> handleCache(sender, args);
-            default -> sendUsage(sender);
-        }
-        return true;
+    public BerliozCommand(@NonNull BerliozServer plugin) {}
+
+    public LiteralArgumentBuilder<CommandSourceStack> createCommand() {
+        var command = Commands.literal("berlioz");
+
+        var stopArgument = Commands.literal("stop");
+        var playArgument = Commands.literal("play");
+
+        stopArgument.executes(this::stop);
+
+        var playerSelector = Commands.argument("targets", ArgumentTypes.players());
+        var trackUriArgument = Commands.argument("uri", new UriArgumentType());
+
+        playArgument.then(
+                playerSelector.then(
+                        trackUriArgument.executes(this::play)
+                )
+        );
+
+        return command
+                .then(stopArgument)
+                .then(playArgument);
     }
 
-    private void handleStop(CommandSender sender) {
-        Location loc = locationOf(sender);
-        if (loc == null) {
-            reply(sender, "This must be run by a player or a command block.", NamedTextColor.RED);
-            return;
-        }
-        BerliozNetwork.stopServerBroadcast(loc);
-        reply(sender, "Stopped the nearest server broadcast.", NamedTextColor.AQUA);
+    private int play(CommandContext<CommandSourceStack> ctx) {
+        var playerSelector = ctx.getArgument("targets", PlayerSelectorArgumentResolver.class);
+        var trackUri = ctx.getArgument("uri", URI.class);
+
+
+        return Command.SINGLE_SUCCESS;
     }
 
-    private void handlePlay(CommandSender sender, String[] args) {
-        if (args.length < 3) {
-            reply(sender, "Usage: /berlioz play <radius> <url>", NamedTextColor.RED);
-            return;
-        }
-        int radius = parseRadius(sender, args[1]);
-        if (radius < 0) return;
-        Location loc = locationOf(sender);
-        if (loc == null) {
-            reply(sender, "This must be run by a player or a command block.", NamedTextColor.RED);
-            return;
-        }
-        String url = args[2];
-        BerliozNetwork.startServerBroadcast(loc, radius, url, sender instanceof BlockCommandSender);
-        reply(sender, "Broadcasting (radius " + radius + "): " + url, NamedTextColor.AQUA);
-    }
+    private int stop(CommandContext<CommandSourceStack> ctx) {
+        var sender = ctx.getSource().getSender();
+        var location = ctx.getSource().getLocation();
 
-    private void handleCache(CommandSender sender, String[] args) {
-        if (args.length < 3) {
-            reply(sender, "Usage: /berlioz cache <radius> <url>", NamedTextColor.RED);
-            return;
-        }
-        int radius = parseRadius(sender, args[1]);
-        if (radius < 0) return;
-        Location loc = locationOf(sender);
-        if (loc == null) {
-            reply(sender, "This must be run by a player or a command block.", NamedTextColor.RED);
-            return;
-        }
-        BerliozNetwork.broadcastCache(loc, radius, args[2]);
-        reply(sender, "Pre-caching (radius " + radius + "): " + args[2], NamedTextColor.AQUA);
-    }
+        if(location == null) {
+            sender.sendMessage(
+                    Component.text(
+                            "This must be run at a location.",
+                            NamedTextColor.RED
+                    )
+            );
 
-    private int parseRadius(CommandSender sender, String arg) {
-        try {
-            int radius = Integer.parseInt(arg);
-            if (radius <= 0) {
-                reply(sender, "Radius must be a positive number.", NamedTextColor.RED);
-                return -1;
-            }
-            return radius;
-        } catch (NumberFormatException e) {
-            reply(sender, "Radius must be a number: " + arg, NamedTextColor.RED);
-            return -1;
+            return Command.SINGLE_SUCCESS;
         }
-    }
 
-    private static Location locationOf(CommandSender sender) {
-        if (sender instanceof Player player) {
-            return player.getLocation();
-        }
-        if (sender instanceof BlockCommandSender block) {
-            return block.getBlock().getLocation();
-        }
-        return null;
-    }
+        BerliozNetwork.stopServerBroadcast(location);
 
-    private static boolean isAllowed(CommandSender sender) {
-        return !(sender instanceof Player) || sender.hasPermission(BerliozNetwork.COMMAND_PERMISSION);
-    }
-
-    private void sendUsage(CommandSender sender) {
-        reply(sender, "Usage: /berlioz <play <radius> <url> | stop | cache <radius> <url>>", NamedTextColor.GRAY);
-    }
-
-    private static void reply(CommandSender sender, String message, NamedTextColor color) {
-        sender.sendMessage(Component.text(message, color));
+        return Command.SINGLE_SUCCESS;
     }
 }
