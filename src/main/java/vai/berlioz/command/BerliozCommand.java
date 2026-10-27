@@ -30,7 +30,15 @@ public class BerliozCommand {
 
         var stopArgument = Commands.literal("stop");
         var playArgument = Commands.literal("play");
-        var preloadArgument = Commands.literal("preload");
+        var preloadArgument = Commands.literal("preload")
+                .then(Commands.argument(
+                        "radius", IntegerArgumentType.integer(1)
+                )
+                        .then(
+                                Commands.argument(
+                                        "uri", new UriArgumentType()
+                                ).executes(this::preload)
+                        ));
 
         stopArgument.executes(this::stop);
 
@@ -46,7 +54,42 @@ public class BerliozCommand {
         return command
                 .then(stopArgument)
                 .then(playArgument)
-                .then(preloadArgument);
+                .then(preloadArgument)
+                .requires(source -> source.getSender().hasPermission(BerliozNetwork.COMMAND_PERMISSION));
+    }
+
+    private int preload(CommandContext<CommandSourceStack> ctx) {
+        var radius = ctx.getArgument("radius", Integer.class);
+        var location = ctx.getSource().getLocation();
+        var trackUri = ctx.getArgument("uri", URI.class);
+
+        var sender = ctx.getSource().getSender();
+
+        try {
+            var trackUrl = trackUri.toURL();
+
+            BerliozNetwork.broadcastCache(
+                    location,
+                    radius,
+                    trackUrl.toString()
+            );
+
+            ctx.getSource().getSender().sendMessage(
+                    Component.text(
+                            "Preloading (radius "+ radius +") :",
+                            NamedTextColor.AQUA
+                    ).append(Component.newline()).append(
+                            Component.text(trackUrl.toString(), NamedTextColor.GRAY)
+                                    .clickEvent(ClickEvent.openUrl(trackUrl))
+                    )
+            );
+        }catch (MalformedURLException e) {
+            sender.sendMessage(
+                    Component.text(e.getMessage(), NamedTextColor.RED)
+            );
+        }
+
+        return Command.SINGLE_SUCCESS;
     }
 
     private int play(CommandContext<CommandSourceStack> ctx) {
